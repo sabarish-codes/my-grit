@@ -12,6 +12,7 @@ const map = new Map<number, MyWebSocket[]>(); // 1: [socket1, socket2]
 wss.on("connection", (socket) => {
 	userCount++;
 	console.log("Total users: ", userCount);
+	socket.send("Success");
 
 	socket.on("message", (message) => {
 		
@@ -25,6 +26,7 @@ wss.on("connection", (socket) => {
 			mySocket.clientName = parsedMessage.payload.clientName;
 			sockets.push(mySocket);
 			map.set(roomId, sockets);
+			socket.send("Success");
 			console.log('Client: ', mySocket.clientName, 'joined Room: ', roomId);
 		}
 
@@ -43,6 +45,7 @@ wss.on("connection", (socket) => {
 					break;
 				}
 			}
+			socket.send("Success");
 		}
 	})
 
