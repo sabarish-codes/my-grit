@@ -6,6 +6,36 @@
 var topKFrequent = function(nums, k) {
     
     const map = new Map();
+    let maxCount = 1;
+    nums.forEach(n => {
+        if(map.has(n)){
+            const count = map.get(n)+1;
+            maxCount = maxCount>count ? maxCount : count;
+            map.set(n, count);
+        }
+        else
+            map.set(n, 1);
+    });
+
+    const buckets = Array.from({length: maxCount+1}, () => []);
+    for(const [n, count] of map)
+        buckets[count].push(n);
+        
+    const result = [];
+    outer: for(let i=buckets.length-1; i>=0; i--){
+        const a = buckets[i];
+        for(let j of a){
+            result.push(j);
+            if(result.length === k)
+                break outer;
+        }
+    }
+    return result;
+
+
+
+    /*
+    const map = new Map();
     nums.forEach(n => map.set(n, (map.get(n) || 0) + 1) );
 
     function MinHeap(){
@@ -68,9 +98,15 @@ var topKFrequent = function(nums, k) {
         result.push(heap.pop()[0])
 
     return result;
+    */
 };
 
 /*
+Bucket method:
+Time complexity - O(n)
+Space complexity - O(n)
+
+Heap method:
 Time complexity - O(n log k)
 Space complexity - O(n)
 */
