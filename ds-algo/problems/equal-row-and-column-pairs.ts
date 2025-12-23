@@ -12,7 +12,7 @@ function equalPairs(grid: number[][]): number {
     let pairs: number = 0;
     for(const rows of grid){
         const key = JSON.stringify(rows);
-        if(map.has(key)) pairs += map.get(key);
+        if(map.has(key)) pairs += map.get(key) || 0;
     }
     return pairs;
 };
