@@ -41,3 +41,15 @@ sendRequest(myClient, 'Zoro');
 sendRequest(myClient, 'Sanji');
 
 closeConnection(myClient);
+
+/*
+Logs: 
+
+Luffy send by Client 1
+Zoro send by Client 1
+Sanji send by Client 1
+Socket closing initiated for Client 1
+Response from server:  LuffyZoroSanji
+Server stopped sending for Client 1
+Socket closed for Client 1
+*/

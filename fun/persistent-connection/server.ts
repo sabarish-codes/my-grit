@@ -34,3 +34,14 @@ const server = net.createServer((socket: Socket) => {
 server.listen(3000, () => {
     console.log('Server listening on PORT 3000');
 })
+
+/*
+Logs: 
+
+Server listening on PORT 3000
+Connection successful Client - Socket 1
+Message from client:  Luffy
+Message from client:  ZoroSanji
+Stopped receiving from Socket 1
+Socket 1 closed
+*/
