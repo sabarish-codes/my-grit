@@ -16,11 +16,31 @@ type ItemParams = {
     id: string
 }
 
+type ApiResponseBody = {
+    data: Item,
+    message: string
+}
+type ApiResponse = {
+    status: number,
+    body: ApiResponseBody
+}
+
 
 const items = new Map<string, Item>();
 
+const idempotencyStore = new Map<string, ApiResponse>(); // key: item
+
 // create item
 app.post('/items', (req: Request, res: Response) => {
+
+    const idempotencyKey = req.headers['idempotency-key'] as string | undefined; // express converts all http headers to lowercase
+                                                                                 // 'idempotency-key' works but 'Idempotency-Key' didn't
+    console.log(idempotencyKey);
+    if(idempotencyKey && idempotencyStore.has(idempotencyKey)){
+        const stored = idempotencyStore.get(idempotencyKey);
+        return res.status(stored?.status || 201).json(stored?.body)
+    }
+
     const name: string = req.body.name;
     if(!name){
         return res.status(400).json({message: 'name required'});
@@ -33,7 +53,17 @@ app.post('/items', (req: Request, res: Response) => {
         createdAt: new Date()
     }
     items.set(id, item);
-    console.log('Items: ', items);
+    
+    if(idempotencyKey){ // store only when the key exists, to prevent undefined: response
+        idempotencyStore.set(idempotencyKey, {
+            status: 201,
+            body: {
+                data: item,
+                message: 'Item created successfully'
+            }
+        });
+    }
+    console.log('Items: ', items.size);
 
     return res.status(201).json({data: item, message: 'Item created successfully'});
 })
