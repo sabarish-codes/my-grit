@@ -1,6 +1,6 @@
 import express from 'express';
 import type { Request, Response } from 'express';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 
 const app = express();
 
@@ -20,15 +20,17 @@ type ApiResponseBody = {
     data: Item,
     message: string
 }
-type ApiResponse = {
+
+type IdempotencyRecord = {
     status: number,
-    body: ApiResponseBody
+    body: ApiResponseBody,
+    bodyHash: string
 }
 
 
 const items = new Map<string, Item>();
 
-const idempotencyStore = new Map<string, ApiResponse>(); // key: item
+const idempotencyStore = new Map<string, IdempotencyRecord>(); // key: item
 
 // create item
 app.post('/items', (req: Request, res: Response) => {
@@ -38,6 +40,10 @@ app.post('/items', (req: Request, res: Response) => {
     console.log(idempotencyKey);
     if(idempotencyKey && idempotencyStore.has(idempotencyKey)){
         const stored = idempotencyStore.get(idempotencyKey);
+        const currentBodyHash = hashPayload(req.body);
+        if(currentBodyHash !== stored?.bodyHash){
+            return res.status(409).json({message: 'Conflict - Idempotency key used with different payload'})
+        }
         return res.status(stored?.status || 201).json(stored?.body)
     }
 
@@ -53,14 +59,16 @@ app.post('/items', (req: Request, res: Response) => {
         createdAt: new Date()
     }
     items.set(id, item);
-    
+
     if(idempotencyKey){ // store only when the key exists, to prevent undefined: response
+        const bodyHash = hashPayload(req.body);
         idempotencyStore.set(idempotencyKey, {
             status: 201,
             body: {
                 data: item,
                 message: 'Item created successfully'
-            }
+            },
+            bodyHash
         });
     }
     console.log('Items: ', items.size);
@@ -102,7 +110,9 @@ app.delete('/items/:id', (req: Request<ItemParams>, res: Response) => {
     return res.status(204).json({message: 'Item deleted successfully'});
 })
 
-
+function hashPayload(body: any){
+    return createHash('sha256').update(JSON.stringify(body)).digest('hex');
+}
 
 app.listen(3000, () => {
     console.log('Server listening on PORT 3000');
