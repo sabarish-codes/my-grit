@@ -24,6 +24,7 @@ type ApiResponseBody = {
 type IdempotencyRecord = {
     status: 'IN_PROGRESS' | 'COMPLETED',
     bodyHash: string,
+    resourceId: string,
     responseStatus?: number,
     responseBody?: ApiResponseBody
 }
@@ -61,7 +62,21 @@ app.post('/items', (req: Request, res: Response) => {
 
         //in progress request
         if(stored.status === 'IN_PROGRESS'){
-            return res.status(409).json({message: 'Conflict - Request with this idempotency key is in progress'})
+            
+            //server crashed before updating store but item created
+            if(items.has(stored.resourceId)){
+                const item = items.get(stored.resourceId)!;
+                stored.status = 'COMPLETED';
+                stored.responseStatus = 201;
+                stored.responseBody = {
+                    data: item,
+                    message: 'Item created successfully'
+                }
+                return res.status(stored.responseStatus!).json(stored.responseBody);
+            }
+            else{
+                return res.status(409).json({message: 'Conflict - request with idempotency key is in progress'})
+            }
         }
 
         //completed request - happy path
@@ -81,14 +96,18 @@ app.post('/items', (req: Request, res: Response) => {
     }
     */
 
+    const id = randomUUID(); // this id will be used as resourceId in record, it acts as metadata of sideeffect
+                             // in failure scenarios, server able to distinguish resource exists or not
+
     //add idempotency key in store with status as in_progress
     const record: IdempotencyRecord = {
         status: 'IN_PROGRESS',
-        bodyHash
+        bodyHash,
+        resourceId: id
     }
     idempotencyStore.set(idempotencyKey, record)
 
-    const id = randomUUID();
+    
     const item: Item = {
         id,
         name,
