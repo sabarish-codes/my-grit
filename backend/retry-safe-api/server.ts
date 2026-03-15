@@ -22,9 +22,10 @@ type ApiResponseBody = {
 }
 
 type IdempotencyRecord = {
-    status: number,
-    body: ApiResponseBody,
-    bodyHash: string
+    status: 'IN_PROGRESS' | 'COMPLETED',
+    bodyHash: string,
+    responseStatus?: number,
+    responseBody?: ApiResponseBody
 }
 
 
@@ -35,9 +36,41 @@ const idempotencyStore = new Map<string, IdempotencyRecord>(); // key: item
 // create item
 app.post('/items', (req: Request, res: Response) => {
 
+    const name: string = req.body.name;
+    if(!name){
+        return res.status(400).json({message: 'Missing name field'});
+    }
+
+    const bodyHash = hashPayload(req.body);
+
     const idempotencyKey = req.headers['idempotency-key'] as string | undefined; // express converts all http headers to lowercase
                                                                                  // 'idempotency-key' works but 'Idempotency-Key' didn't
+    
+    if(!idempotencyKey){
+        return res.status(400).json({message: 'Missing Idempotency key header'});
+    }
     console.log(idempotencyKey);
+
+    if(idempotencyStore.has(idempotencyKey)){
+        const stored: IdempotencyRecord = idempotencyStore.get(idempotencyKey)!;
+        
+        //checking hashed values of body
+        if(bodyHash !== stored.bodyHash){
+            return res.status(409).json({message: 'Conflict - Idempotency key used with different payload'});
+        }
+
+        //in progress request
+        if(stored.status === 'IN_PROGRESS'){
+            return res.status(409).json({message: 'Conflict - Request with this idempotency key is in progress'})
+        }
+
+        //completed request - happy path
+        if(stored.status === 'COMPLETED'){
+            return res.status(stored.responseStatus!).json(stored.responseBody);
+        }
+    }
+
+    /*
     if(idempotencyKey && idempotencyStore.has(idempotencyKey)){
         const stored = idempotencyStore.get(idempotencyKey);
         const currentBodyHash = hashPayload(req.body);
@@ -46,11 +79,14 @@ app.post('/items', (req: Request, res: Response) => {
         }
         return res.status(stored?.status || 201).json(stored?.body)
     }
+    */
 
-    const name: string = req.body.name;
-    if(!name){
-        return res.status(400).json({message: 'name required'});
+    //add idempotency key in store with status as in_progress
+    const record: IdempotencyRecord = {
+        status: 'IN_PROGRESS',
+        bodyHash
     }
+    idempotencyStore.set(idempotencyKey, record)
 
     const id = randomUUID();
     const item: Item = {
@@ -60,17 +96,14 @@ app.post('/items', (req: Request, res: Response) => {
     }
     items.set(id, item);
 
-    if(idempotencyKey){ // store only when the key exists, to prevent undefined: response
-        const bodyHash = hashPayload(req.body);
-        idempotencyStore.set(idempotencyKey, {
-            status: 201,
-            body: {
-                data: item,
-                message: 'Item created successfully'
-            },
-            bodyHash
-        });
+    //update idempotency record in the store with status and body
+    record.responseStatus = 201;
+    record.responseBody = {
+        data: item,
+        message: 'Item created successfully'
     }
+    record.status = 'COMPLETED';
+
     console.log('Items: ', items.size);
 
     return res.status(201).json({data: item, message: 'Item created successfully'});
