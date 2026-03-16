@@ -1,5 +1,7 @@
 import type { Item, IdempotencyRecord, ApiResponseBody } from "./types";
+import { createHash } from 'crypto';
 
+// Items
 const items = new Map<string, Item>(); // uuid: item 
 
 export function createItem(id: string, item: Item){
@@ -15,6 +17,8 @@ export function deleteItem(id: string){
 }
 
 
+
+// Idempotency Records
 const idempotencyRecord = new Map<string, IdempotencyRecord>(); // uuid: record
 
 export function claimIdempotencyKey(idempotencyKey: string, bodyHash: string, resourceId: string): 
@@ -45,4 +49,14 @@ export function completeIdempotencyKey(idempotencyKey: string, responseStatus: n
     record.responseStatus = responseStatus;
     record.responseBody = responseBody;
     record.status = 'COMPLETED';
+}
+
+
+// hash the body of the request
+export function hashBody(body: any){
+    return createHash('sha256').update(JSON.stringify(body)).digest('hex');
+}
+
+export function itemsSize(){
+    console.log(`Items: ${items.size} , Process: ${process.pid}`);
 }

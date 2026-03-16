@@ -69,7 +69,28 @@ async function retrySimulation(){
         sendWithKey(key, body);
     }, 1000);
 }
-retrySimulation()
+
+
+async function send(port: number){
+    const response = await fetch(`http://localhost:${port}/items`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': 'race-condition'
+        },
+        body: JSON.stringify({name: 'Gol D Roger'})
+    });
+    const result = await response.json();
+    console.log(`Port ${port}: ${response.status} ${result.message}`);
+}
+
+async function raceRun(){
+    await Promise.all([
+        send(3001),
+        send(3002)
+    ])
+}
+raceRun();
 
 
 
