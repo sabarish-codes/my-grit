@@ -21,6 +21,11 @@ export function deleteItem(id: string){
 // Idempotency Records
 const idempotencyRecord = new Map<string, IdempotencyRecord>(); // uuid: record
 
+
+// To handle concurrency race conditions - make the claim idempotency key as atomic
+// check, set should be one operation to bypass toctou (NON_EXISTENT to setting IN_PROGRESS should be atomic)
+// here js internally handles this because the code is synchronous so eventloop executes this fully and then move on to next
+// in real systems usually Database is used since the insert operation is atomic
 export function claimIdempotencyKey(idempotencyKey: string, bodyHash: string, resourceId: string): 
                                     {success: boolean, record?: IdempotencyRecord}
 {
