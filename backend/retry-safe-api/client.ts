@@ -85,10 +85,8 @@ async function send(port: number){
 }
 
 async function raceRun(){
-    await Promise.all([
-        send(3001),
-        send(3002)
-    ])
+    send(3001);
+    setTimeout(() => send(3002), 500);
 }
 raceRun();
 

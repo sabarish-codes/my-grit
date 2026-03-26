@@ -15,9 +15,11 @@ export interface ApiResponseBody {
 }
 
 export interface IdempotencyRecord {
+    ownerId: string,
     status: 'IN_PROGRESS' | 'COMPLETED',
     bodyHash: string,
     resourceId: string,
     responseStatus?: number,
     responseBody?: ApiResponseBody
+    createdAt: number
 }

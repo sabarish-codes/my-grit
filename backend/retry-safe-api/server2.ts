@@ -1,6 +1,6 @@
 import express from 'express';
 import type {Request, Response} from 'express';
-import { readItem, createItem, deleteItem, hashBody, claimIdempotencyKey, completeIdempotencyKey, itemsSize } from './sharedStore';
+import { readItem, createItem, deleteItem, hashBody, claimIdempotencyKey, completeIdempotencyKey, itemsSize, takeOwnership, isOwnershipExpired } from './sharedStore';
 import { ItemParams, Item } from './types';
 import { randomUUID } from 'crypto';
 
@@ -26,8 +26,16 @@ app.post('/items', (req: Request<ItemParams>, res: Response) => {
 
     const bodyHash = hashBody(req.body);
     const itemId = randomUUID(); // resource id acts as metadata of sideeffect to handle partial failure scenarios(pre-store crash)
+    const ownerId = randomUUID(); // owner id is used to prevent lost update concurrency problem making write ownership driven
 
-    const claim = claimIdempotencyKey(idempotencyKey, bodyHash, itemId);
+    // resource to be created
+    const item: Item = {
+        id: itemId,
+        name,
+        createdAt: new Date()
+    }
+
+    const claim = claimIdempotencyKey(ownerId, idempotencyKey, bodyHash, itemId);
 
     // idempotency key exists in record
     if(!claim.success){
@@ -38,38 +46,43 @@ app.post('/items', (req: Request<ItemParams>, res: Response) => {
             return res.status(409).json({message: 'Conflict - Different payload detected'});
         }
 
-        // In progress 
-        const item = readItem(record.resourceId);
-        const resourceExists: boolean = item ? true : false;
-
-        if(record.status==='IN_PROGRESS' && resourceExists){ // partial failure, pre-store crash happenend so recover and store
-            record.responseStatus = RESPONSE_STATUS;
-            record.responseBody = {
-                data: item!,
-                message: RESPONSE_MESSAGE
-            };
-            record.status = 'COMPLETED';
-            return res.status(record.responseStatus).json(record.responseBody);
-        }
-
-        if(record.status==='IN_PROGRESS' && !resourceExists){ // the request is in process , resource not created
-            return res.status(409).json({message: 'Request in in progress'});
-        }
-
         // completed request - happy path
         if(record.status === 'COMPLETED'){
             return res.status(record.responseStatus!).json(record.responseBody);
         }
-    }
 
-    const item: Item = {
-        id: itemId,
-        name,
-        createdAt: new Date()
+        // If the status is not COMPLETED, then it is IN_PROGRESS only
+        // In progress - 4 possible cases 
+        const createdItem = readItem(record.resourceId);
+        const resourceExists: boolean = createdItem ? true : false;
+        const expired = isOwnershipExpired(idempotencyKey);
+
+        if(!expired && resourceExists){ // reconstruct response but don't update in record
+            return res.status(RESPONSE_STATUS).json({data: createdItem, message: RESPONSE_MESSAGE});
+        }
+
+        if(!expired && !resourceExists){
+            return res.status(409).json({message: 'Request is in progress'});
+        }
+
+        if(expired && resourceExists){ // partial-faliure, pre-store crash happened also ownership expired, so take ownership, recover and store
+            takeOwnership(idempotencyKey, ownerId);
+            completeIdempotencyKey(ownerId, idempotencyKey, RESPONSE_STATUS, {data: createdItem!, message: RESPONSE_MESSAGE});
+            return res.status(record.responseStatus!).json(record.responseBody);
+        }
+
+        if(expired && !resourceExists){// expired and resource not exists, so take ownership, create resource and update idempotency store
+            takeOwnership(idempotencyKey, ownerId);
+            createItem(record.resourceId, item);
+            completeIdempotencyKey(ownerId, idempotencyKey, RESPONSE_STATUS, {data: item, message: RESPONSE_MESSAGE});
+            return res.status(record.responseStatus!).json(record.responseBody);
+        }
+        
     }
+    
     createItem(itemId, item);
 
-    completeIdempotencyKey(idempotencyKey, RESPONSE_STATUS, {data: item, message: RESPONSE_MESSAGE});
+    completeIdempotencyKey(ownerId, idempotencyKey, RESPONSE_STATUS, {data: item, message: RESPONSE_MESSAGE});
     itemsSize();
     return res.status(RESPONSE_STATUS).json({data: item, message: RESPONSE_MESSAGE});
 
