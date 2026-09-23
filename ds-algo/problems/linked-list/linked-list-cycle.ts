@@ -1,5 +1,4 @@
-
-
+import { ListNode } from "./list-node";
 function hasCycle(head: ListNode | null): boolean {
     
     if(!head) return false;
