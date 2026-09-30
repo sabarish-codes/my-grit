@@ -1,4 +1,4 @@
-class ListNode<T> {
+export class ListNode<T> {
     public value: T;
     public prev: ListNode<T> | null = null;
     public next: ListNode<T> | null = null;
