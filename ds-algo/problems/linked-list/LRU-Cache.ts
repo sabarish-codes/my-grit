@@ -76,9 +76,39 @@ class LRUNode {
     }
 }
 
-/**
- * Your LRUCache object will be instantiated and called as such:
- * var obj = new LRUCache(capacity)
- * var param_1 = obj.get(key)
- * obj.put(key,value)
- */
+/*
+Language specific optimization : Since Js/Ts insert keys in hashmap like a queue
+the below code is faster but needs some more internal memory
+
+class LRUCache {
+
+    private capacity: number;
+    private cache: Map<number, number>;
+
+    constructor(capacity: number) {
+        this.capacity = capacity;
+        this.cache = new Map<number, number>();
+    }
+
+    get(key: number): number {
+        if(!this.cache.has(key)){
+            return -1;
+        }
+        const value = this.cache.get(key);
+        this.cache.delete(key);
+        this.cache.set(key, value);
+        return value;
+    }
+
+    put(key: number, value: number): void {
+        if(this.cache.has(key)){
+            this.cache.delete(key);
+        }
+        this.cache.set(key, value);
+        if(this.cache.size > this.capacity){
+            const LRUKey = this.cache.keys().next().value;
+            this.cache.delete(LRUKey);
+        }
+    }
+}
+*/
