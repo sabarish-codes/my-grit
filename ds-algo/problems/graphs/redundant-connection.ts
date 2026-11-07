@@ -1,5 +1,5 @@
 function findRedundantConnection(edges: number[][]): number[] {
-    const graph = Array.from({length: edges.length+1}, () => []);
+    const graph = Array.from({length: edges.length+1}, () => [] as number[]);
     for(const [a, b] of edges){
         graph[a].push(b);
         graph[b].push(a);
