@@ -1,22 +1,45 @@
 function findRedundantConnection(edges: number[][]): number[] {
-    const graph = Array.from({length: edges.length+1}, () => [] as number[]);
-    for(const [a, b] of edges){
-        graph[a].push(b);
-        graph[b].push(a);
-        if(cycle(a)) return [a, b];
+    const u = new UnionFind(edges.length);
+    for(const [a,b] of edges){
+        if(!u.union(a,b)) return [a,b];
     }
     return [];
-
-    function cycle(node: number, parent: number = 0, path = new Set<number>(), visited = new Set<number>()): boolean {
-        if(visited.has(node)) return false;
-        path.add(node);
-        for(const n of graph[node]){
-            if(n === parent) continue;
-            if(path.has(n)) return true;
-            if(cycle(n, node, path, visited)) return true;
-        }
-        path.delete(node);
-        visited.add(node);
-        return false;
-    }
 };
+
+/*
+time - O(E alpha(V))
+space - O(n)
+ Each edge is processed once. Each union or find operation runs in near-constant amortized time due to path compression and union by size. Overall, O(E α(V)) time, where α is the inverse Ackermann function, effectively constant for practical input sizes.
+*/
+
+
+class UnionFind {
+    private parent: number[];
+    private size: number[];
+
+    constructor(n: number) {
+        this.parent = Array.from({length: n+1}, (_, i) => i);
+        this.size = Array.from({length: n+1}, () => 1);
+    }
+
+    find(i: number): number {
+        if(i === this.parent[i]) return i;
+        return this.parent[i] = this.find(this.parent[i]);
+    }
+
+    union(u: number, v: number): boolean {
+        let rootU = this.find(u);
+        let rootV = this.find(v);
+
+        if(rootU === rootV) return false;
+        if(this.size[rootU] < this.size[rootV]) [rootU, rootV] = [rootV, rootU];
+
+        this.parent[rootV] = rootU;
+        this.size[rootU] += this.size[rootV];
+        return true;
+    }
+
+    isConnected(u: number, v: number): boolean {
+        return this.find(u) === this.find(v);
+    }
+}
